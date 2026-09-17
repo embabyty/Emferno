@@ -44,7 +44,7 @@ jobs:
           submodules: true
       - name: Install dependencies
         run: |
-          brew install libtool meson ninja pkgconf glib gnutls jpeg-turbo libpng libslirp libssh libusb lzo ncurses nettle pixman snappy vde zstd lzfse
+          brew install libtool meson ninja pkgconf dtc glib gnutls jpeg-turbo libpng libslirp libssh libusb lzo ncurses pixman snappy vde zstd libtasn1 lzfse
       - name: Build
         run: |
           LIBTOOL="glibtool" meson setup build . -Dsdl=disabled -Dgtk=disabled -Dcocoa=enabled -Dc_args="-DNCURSES_WIDECHAR=1"

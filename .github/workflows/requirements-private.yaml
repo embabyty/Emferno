@@ -1,0 +1,88 @@
+name: requirements (private)
+
+# Manual-only. Does NOT download, generate, or publish any Apple firmware.
+# It only assembles files YOU provide as GitHub Secrets into a private
+# run artifact that only someone with access to your Actions runs can download.
+# Nothing is committed, released, or logged.
+on:
+  workflow_dispatch:
+
+jobs:
+  assemble:
+    name: Assemble requirements (owner only)
+    # "for me only": only the repo owner can run this.
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    env:
+      ROOT_QCOW2_B64: ${{ secrets.ROOT_QCOW2_B64 }}
+      NVME_FIRMWARE_B64: ${{ secrets.NVME_FIRMWARE_B64 }}
+      SYSCFG_B64: ${{ secrets.SYSCFG_B64 }}
+      CTRL_BITS_B64: ${{ secrets.CTRL_BITS_B64 }}
+      NVRAM_B64: ${{ secrets.NVRAM_B64 }}
+      EFFACEABLE_B64: ${{ secrets.EFFACEABLE_B64 }}
+      PANIC_LOG_B64: ${{ secrets.PANIC_LOG_B64 }}
+      SEP_NVRAM_B64: ${{ secrets.SEP_NVRAM_B64 }}
+      SEP_SSC_B64: ${{ secrets.SEP_SSC_B64 }}
+      TICKET_B64: ${{ secrets.TICKET_B64 }}
+      SEP_FIRMWARE_B64: ${{ secrets.SEP_FIRMWARE_B64 }}
+      KERNELCACHE_B64: ${{ secrets.KERNELCACHE_B64 }}
+      DEVICE_TREE_B64: ${{ secrets.DEVICE_TREE_B64 }}
+      TRUSTCACHE_B64: ${{ secrets.TRUSTCACHE_B64 }}
+      SEP_ROM_B64: ${{ secrets.SEP_ROM_B64 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Assemble private requirements bundle
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/private-requirements"
+          mkdir -p "$OUT"
+
+          # Map of output filename -> env var holding base64 of YOUR OWN dump.
+          # Provide your own dumps only. No URLs, no fetching.
+          write_one() {
+            name="$1"
+            var="$2"
+            val="${!var:-}"
+            if [ -n "$val" ]; then
+              printf '%s' "$val" | base64 -d > "$OUT/$name"
+              echo "present: $name"
+            else
+              echo "missing: $name"
+            fi
+          }
+
+          write_one "root.qcow2" "ROOT_QCOW2_B64"
+          write_one "nvme-firmware.bin" "NVME_FIRMWARE_B64"
+          write_one "syscfg.bin" "SYSCFG_B64"
+          write_one "ctrl_bits.bin" "CTRL_BITS_B64"
+          write_one "nvram.bin" "NVRAM_B64"
+          write_one "effaceable.bin" "EFFACEABLE_B64"
+          write_one "panic_log.bin" "PANIC_LOG_B64"
+          write_one "sep-nvram.bin" "SEP_NVRAM_B64"
+          write_one "sep-ssc.bin" "SEP_SSC_B64"
+          write_one "ticket.bin" "TICKET_B64"
+          write_one "sep-firmware.bin" "SEP_FIRMWARE_B64"
+          write_one "kernelcache" "KERNELCACHE_B64"
+          write_one "devicetree.bin" "DEVICE_TREE_B64"
+          write_one "trustcache.bin" "TRUSTCACHE_B64"
+          write_one "sep-rom.bin" "SEP_ROM_B64"
+
+          ( cd "$OUT" && sha256sum * > MANIFEST.sha256 2>/dev/null || true )
+          ls -l "$OUT" || true
+          echo "---"
+          echo "Bundle assembled locally in the runner only. Download it from this run's Artifacts, then delete the run."
+          echo "Nothing was committed or released."
+
+      - name: Upload private bundle (1 day, do not share)
+        uses: actions/upload-artifact@v4
+        with:
+          name: requirements-private
+          path: private-requirements/
+          retention-days: 1
+          if-no-files-found: warn
